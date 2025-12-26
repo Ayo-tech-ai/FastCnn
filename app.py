@@ -117,19 +117,19 @@ if uploaded_file and api_url and cnn_api_key and openai_api_key:
                             {
                                 "type": "input_text",
                                 "text": f"""
-An AI system has analyzed an image of a cassava plant leaves and identified
+An AI system has analyzed an image of cassava plant leaves and identified
 the disease as **{disease_name}** with a confidence of **{confidence:.2f}%**.
 
-Please provide a detailed, clear, farmer-friendly explanation that includes:
-- The visible signs and symptoms in the image
+Provide a detailed, clear, and farmer-friendly report that includes:
+- A detailed description of the visible signs and symptoms in the image
 - The cause of the disease
 - How the disease spreads
-- Symptoms of the disease is various stages of its growth 
-- Preventive measures that can be carried out by farmers in Africa 
+- Symptoms of the disease at various stages of its growth
+- Preventive measures that can be carried out by farmers in Africa
 - Practical actions the farmer can take to reduce or eradicate the disease
-- Physical signs and observations the farmer can look out for next time about the disease 
+- Physical signs and observations the farmer can look out for in the future
 
-Keep the explanation natural and helpful.
+Deliver the information as a **structured advisory report**, focusing on facts and guidance for the farmer. Do not frame it as a conversation, a chat, or include any self-references.
 """
                             },
                             {
