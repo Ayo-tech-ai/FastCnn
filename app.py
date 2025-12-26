@@ -5,62 +5,57 @@ import base64
 from openai import OpenAI
 
 # --------------------------------------------------
-# Page config
+# Page configuration
 # --------------------------------------------------
 st.set_page_config(
     page_title="AI Crop Disease Detection",
     layout="centered"
 )
 
-st.title("🌱 AI Crop Disease Detection & Advisory System")
+st.title("🌱 AI Crop Disease Detection & Advisory")
 st.write(
-    """
-    This system combines:
-    - **CNN-based disease classification** (primary model)
-    - **GPT-4 Vision** for explanation, symptoms, and preventive guidance
-    """
+    "Upload an image of a crop leaf to receive disease detection and practical farming guidance."
 )
 
 # --------------------------------------------------
 # User inputs
 # --------------------------------------------------
 api_url = st.text_input(
-    "Enter your FastAPI /predict URL:",
+    "FastAPI Prediction URL",
     placeholder="https://xxxx.ngrok-free.app/predict"
 )
 
 cnn_api_key = st.text_input(
-    "Enter your CNN API Key:",
+    "System Access Key",
     type="password"
 )
 
 openai_api_key = st.text_input(
-    "Enter your OpenAI API Key:",
+    "AI Advisory Key",
     type="password"
 )
 
 uploaded_file = st.file_uploader(
-    "Upload an image of the crop/leaf",
+    "Upload an image",
     type=["jpg", "jpeg", "png"]
 )
 
 # --------------------------------------------------
-# Main logic
+# Main pipeline
 # --------------------------------------------------
 if uploaded_file and api_url and cnn_api_key and openai_api_key:
 
     # Display uploaded image
-    st.write("### 📸 Uploaded Image")
     image = Image.open(uploaded_file)
-    st.image(image, width=300)
+    st.image(image, caption="Uploaded Image", width=320)
 
     # --------------------------------------------------
-    # 1️⃣ CNN PREDICTION (Primary Model)
+    # Step 1: Disease Detection (internal)
     # --------------------------------------------------
     files = {"file": uploaded_file.getvalue()}
     headers = {"x-api-key": cnn_api_key}
 
-    with st.spinner("🔬 Running CNN disease classification..."):
+    with st.spinner("Analyzing image..."):
         try:
             response = requests.post(
                 api_url,
@@ -70,47 +65,42 @@ if uploaded_file and api_url and cnn_api_key and openai_api_key:
             )
 
             if response.status_code != 200:
-                st.error("❌ Error from CNN server")
-                st.write(response.text)
+                st.error("Unable to analyze image at the moment.")
                 st.stop()
 
-            cnn_result = response.json()
+            result = response.json()
 
         except Exception as e:
-            st.error("❌ Could not connect to CNN backend")
-            st.write(e)
+            st.error("Connection error. Please try again.")
             st.stop()
 
-    # Extract CNN output
-    disease_name = cnn_result.get("prediction_name")
-    confidence_scores = cnn_result.get("confidence_percentages")
-    confidence = (
-        confidence_scores[0]
-        if isinstance(confidence_scores, list)
-        else None
-    )
+    # --------------------------------------------------
+    # Correct confidence extraction (FIXED)
+    # --------------------------------------------------
+    prediction_index = result.get("prediction_index")
+    disease_name = result.get("prediction_name")
+    confidence_percentages = result.get("confidence_percentages")
 
-    # Display CNN result
-    st.success("✅ CNN Prediction Complete")
-    st.write("### 🧪 CNN Classification Result")
-    st.write(f"**Detected Disease:** {disease_name}")
-    st.write(f"**Confidence:** {confidence:.2f}%")
+    confidence = None
+    if (
+        isinstance(confidence_percentages, list)
+        and len(confidence_percentages) > 0
+        and isinstance(confidence_percentages[0], list)
+    ):
+        confidence = confidence_percentages[0][prediction_index]
 
     # --------------------------------------------------
-    # 2️⃣ GPT-4V EXPLANATION (Secondary Model)
+    # Step 2: Explanation & Guidance (internal)
     # --------------------------------------------------
-    st.write("### 🧠 AI Explanation & Farmer Guidance")
-
-    # Encode image for GPT-4V
     image_bytes = uploaded_file.getvalue()
     image_base64 = base64.b64encode(image_bytes).decode("utf-8")
     image_data_url = f"data:image/jpeg;base64,{image_base64}"
 
     client = OpenAI(api_key=openai_api_key)
 
-    with st.spinner("📖 Generating explanation and agricultural guidance..."):
+    with st.spinner("Preparing insights and recommendations..."):
         try:
-            gpt_response = client.responses.create(
+            ai_response = client.responses.create(
                 model="gpt-4.1-mini",
                 input=[
                     {
@@ -119,21 +109,18 @@ if uploaded_file and api_url and cnn_api_key and openai_api_key:
                             {
                                 "type": "input_text",
                                 "text": f"""
-A CNN model has detected the crop disease **{disease_name}**
-with a confidence of **{confidence:.2f}%**.
+An AI system has analyzed an image of a cassava plant and identified
+the disease as **{disease_name}** with a confidence of **{confidence:.2f}%**.
 
-You are an agricultural assistant.
+Please provide a clear, farmer-friendly explanation that includes:
+- What is visible in the image
+- The likely cause of the disease
+- How the disease spreads
+- Symptoms relevant to what is seen
+- Preventive measures
+- Practical actions the farmer can take
 
-Please provide:
-1. A brief description of what you observe in the image
-2. The likely causative agent of this disease
-3. How the disease spreads
-4. Symptoms that match what is visible in the image
-5. Preventive measures
-6. Practical actions a farmer can take
-
-Do NOT change or dispute the CNN prediction.
-Explain in clear, farmer-friendly language.
+Keep the explanation natural and helpful.
 """
                             },
                             {
@@ -145,13 +132,25 @@ Explain in clear, farmer-friendly language.
                 ]
             )
 
-            explanation = gpt_response.output_text
+            explanation = ai_response.output_text
 
-            st.markdown(explanation)
+        except Exception:
+            explanation = (
+                "The disease was detected successfully, but additional guidance "
+                "could not be generated at this time."
+            )
 
-        except Exception as e:
-            st.error("❌ GPT-4V explanation failed")
-            st.write(e)
+    # --------------------------------------------------
+    # Unified output (ONE FLOW)
+    # --------------------------------------------------
+    st.success("Analysis Complete")
+
+    st.write("### 🧪 Detection Result")
+    st.write(f"**Identified Condition:** {disease_name}")
+    st.write(f"**Confidence Level:** {confidence:.2f}%")
+
+    st.write("### 🌾 Advisory & Recommendations")
+    st.markdown(explanation)
 
 else:
-    st.info("⬆️ Upload an image and provide all required URLs and API keys.")
+    st.info("Please upload an image and provide all required details to begin.")
