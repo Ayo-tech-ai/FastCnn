@@ -27,9 +27,9 @@ if uploaded_file and api_url and api_key:
     image = Image.open(uploaded_file)
     st.image(image, width=300)
 
-    # Prepare file for FastAPI request
+    # --- Prepare file correctly for FastAPI ---
     files = {
-        "file": (uploaded_file.name, uploaded_file, uploaded_file.type)
+        "file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)
     }
     headers = {"x-api-key": api_key}
 
