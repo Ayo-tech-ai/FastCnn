@@ -10,15 +10,15 @@ st.set_page_config(page_title="CNN Image Classifier", layout="centered")
 st.title("🖼️ CNN Image Classifier (FastAPI + ngrok)")
 st.write("Upload an image and provide your FastAPI (ngrok) URL.")
 
-User inputs their ngrok URL
+#User inputs their ngrok URL
 
 api_url = st.text_input("Enter your FastAPI /predict URL:", placeholder="https://xxxx.ngrok-free.app/predict")
 
-API key input
+#API key input
 
 api_key = st.text_input("Enter your API Key:", type="password")
 
-User uploads image
+#User uploads image
 
 uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
