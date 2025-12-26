@@ -52,7 +52,10 @@ if uploaded_file and api_url and cnn_api_key and openai_api_key:
     # --------------------------------------------------
     # Step 1: Disease Detection (internal)
     # --------------------------------------------------
-    files = {"file": uploaded_file.getvalue()}
+    # --- FIX: Send image in proper format for FastAPI ---
+    files = {
+        "file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)
+    }
     headers = {"x-api-key": cnn_api_key}
 
     with st.spinner("Analyzing image..."):
@@ -75,19 +78,24 @@ if uploaded_file and api_url and cnn_api_key and openai_api_key:
             st.stop()
 
     # --------------------------------------------------
-    # Correct confidence extraction (FIXED)
+    # Correct confidence extraction (robust version)
     # --------------------------------------------------
-    prediction_index = result.get("prediction_index")
-    disease_name = result.get("prediction_name")
-    confidence_percentages = result.get("confidence_percentages")
+    prediction_index = result.get("prediction_index", 0)
+    disease_name = result.get("prediction_name", "Unknown")
+    confidence_percentages = result.get("confidence_percentages", [])
 
-    confidence = None
-    if (
-        isinstance(confidence_percentages, list)
-        and len(confidence_percentages) > 0
-        and isinstance(confidence_percentages[0], list)
-    ):
-        confidence = confidence_percentages[0][prediction_index]
+    confidence = 0.0
+
+    if isinstance(confidence_percentages, list) and len(confidence_percentages) > 0:
+        # If it's a nested list, flatten it
+        if isinstance(confidence_percentages[0], list):
+            flat_conf = confidence_percentages[0]
+        else:
+            flat_conf = confidence_percentages
+
+        # Pick the confidence of the predicted class
+        if prediction_index < len(flat_conf):
+            confidence = flat_conf[prediction_index]
 
     # --------------------------------------------------
     # Step 2: Explanation & Guidance (internal)
