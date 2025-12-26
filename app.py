@@ -27,7 +27,7 @@ if uploaded_file and api_url and api_key:
     image = Image.open(uploaded_file)
     st.image(image, width=300)
 
-    # --- Prepare file correctly for FastAPI ---
+    # --- Prepare file for FastAPI ---
     files = {
         "file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)
     }
@@ -40,17 +40,23 @@ if uploaded_file and api_url and api_key:
             if response.status_code == 200:
                 result = response.json()
 
-                # Extract predictions
-                disease_name = result.get("prediction_name", "Unknown")
-                confidence_scores = result.get("confidence_percentages", [])
-                confidence = confidence_scores[0] if confidence_scores else None
+                # --- Extract predicted class and confidence ---
+                prediction_index = result.get("prediction_index", 0)
+                prediction_name = result.get("prediction_name", "Unknown")
+                confidence_percentages = result.get("confidence_percentages", [])
+
+                # Pick confidence of the predicted class
+                if confidence_percentages and prediction_index < len(confidence_percentages):
+                    confidence = confidence_percentages[prediction_index]
+                else:
+                    confidence = 0
 
                 st.success("✅ Prediction received!")
 
-                # Display results
+                # --- Display results ---
                 st.write("### 🧪 Classification Result")
-                st.write(f"**Disease:** {disease_name}")
-                st.write(f"**Confidence:** {confidence:.2f}%" if confidence is not None else "**Confidence:** N/A")
+                st.write(f"**Disease:** {prediction_name}")
+                st.write(f"**Confidence:** {confidence:.2f}%")
 
             else:
                 st.error(f"❌ Error from FastAPI server: {response.status_code}")
