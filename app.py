@@ -1,3 +1,4 @@
+
 import streamlit as st
 import requests
 from PIL import Image
@@ -15,7 +16,7 @@ st.set_page_config(
 
 st.title("🌱 AI Crop Disease Detection & Advisory")
 st.write(
-    "Upload an image of a **cassava leaf** to receive disease detection and practical farming guidance."
+    "Upload a **clear image of a cassava leaf**, then click **Analyze Image** to begin."
 )
 
 # --------------------------------------------------
@@ -41,15 +42,26 @@ uploaded_file = st.file_uploader(
     type=["jpg", "jpeg", "png"]
 )
 
+analyze_btn = st.button("🔍 Analyze Image")
+
 # --------------------------------------------------
-# Main pipeline
+# MAIN PIPELINE (ONLY RUNS ON BUTTON CLICK)
 # --------------------------------------------------
-if uploaded_file and api_url and cnn_api_key and openai_api_key:
+if analyze_btn:
+
+    # Basic guard checks
+    if not uploaded_file:
+        st.warning("Please upload an image first.")
+        st.stop()
+
+    if not (api_url and cnn_api_key and openai_api_key):
+        st.warning("Please provide all required keys and URLs.")
+        st.stop()
 
     image = Image.open(uploaded_file)
     st.image(image, caption="Uploaded Image", width=320)
 
-    # Convert image to base64 for OpenAI
+    # Convert image to base64 (for OpenAI)
     image_bytes = uploaded_file.getvalue()
     image_base64 = base64.b64encode(image_bytes).decode("utf-8")
     image_data_url = f"data:image/jpeg;base64,{image_base64}"
@@ -57,7 +69,7 @@ if uploaded_file and api_url and cnn_api_key and openai_api_key:
     client = OpenAI(api_key=openai_api_key)
 
     # --------------------------------------------------
-    # STEP 0: Cassava Validation (GPT-4V SAFE GATE)
+    # STEP 0: CASSAVA VALIDATION (HARD SAFE GATE)
     # --------------------------------------------------
     with st.spinner("Validating image..."):
         try:
@@ -72,19 +84,16 @@ if uploaded_file and api_url and cnn_api_key and openai_api_key:
                                 "text": """
 You are an agricultural vision expert.
 
-Analyze the image and determine whether it clearly shows **cassava leaves (Manihot esculenta)**.
+Determine whether the image clearly shows **cassava leaves (Manihot esculenta)**.
 
-Rules:
-- Respond ONLY in valid JSON
-- Do NOT include explanations outside JSON
-- Use this exact format:
+Respond ONLY in valid JSON using exactly this format:
 
 {
   "is_cassava": true or false,
   "reason": "short explanation"
 }
 
-If the image is not a cassava leaf, unclear, or shows a different plant or object, return is_cassava as false.
+If the image is unclear, not a plant, or not cassava, return is_cassava as false.
 """
                             },
                             {
@@ -100,21 +109,26 @@ If the image is not a cassava leaf, unclear, or shows a different plant or objec
             validation_result = json.loads(validation_text)
 
             is_cassava = validation_result.get("is_cassava", False)
-            validation_reason = validation_result.get("reason", "")
 
         except Exception:
-            st.error("Image validation failed. Please try again.")
+            st.error(
+                "This picture does not look like a cassava image, "
+                "or the picture is not clear enough. "
+                "Please upload a clear picture of a cassava leaf."
+            )
             st.stop()
 
+    # HARD STOP IF VALIDATION FAILS
     if not is_cassava:
-        st.error("❌ Invalid Image")
-        st.warning(validation_reason or "The uploaded image is not a cassava leaf.")
+        st.error(
+            "❌ This picture does not look like a cassava image, "
+            "or the picture is not clear enough.\n\n"
+            "Please upload a **clear picture of a cassava leaf**."
+        )
         st.stop()
 
-    st.success("✅ Cassava leaf confirmed. Proceeding with analysis...")
-
     # --------------------------------------------------
-    # STEP 1: Disease Detection (CNN MODEL)
+    # STEP 1: CNN DISEASE DETECTION
     # --------------------------------------------------
     files = {
         "file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)
@@ -145,13 +159,17 @@ If the image is not a cassava leaf, unclear, or shows a different plant or objec
     confidence_percentages = result.get("confidence_percentages", [])
 
     confidence = 0.0
-    if isinstance(confidence_percentages, list) and len(confidence_percentages) > 0:
-        flat_conf = confidence_percentages[0] if isinstance(confidence_percentages[0], list) else confidence_percentages
+    if isinstance(confidence_percentages, list) and confidence_percentages:
+        flat_conf = (
+            confidence_percentages[0]
+            if isinstance(confidence_percentages[0], list)
+            else confidence_percentages
+        )
         if prediction_index < len(flat_conf):
             confidence = flat_conf[prediction_index]
 
     # --------------------------------------------------
-    # STEP 2: Advisory & Explanation (GPT)
+    # STEP 2: ADVISORY GENERATION
     # --------------------------------------------------
     with st.spinner("Preparing advisory report..."):
         try:
@@ -164,16 +182,16 @@ If the image is not a cassava leaf, unclear, or shows a different plant or objec
                             {
                                 "type": "input_text",
                                 "text": f"""
-An AI system analyzed an image of cassava leaves and identified the disease as **{disease_name}**
-with a confidence of **{confidence:.2f}%**.
+An AI system analyzed an image of cassava leaves and identified the disease as
+**{disease_name}** with a confidence of **{confidence:.2f}%**.
 
-Provide a **structured, farmer-friendly advisory report** covering:
+Provide a **structured, farmer-friendly advisory report** including:
 - Visible signs and symptoms
 - Cause of the disease
 - How it spreads
 - Symptoms at different stages
 - Preventive measures suitable for African farmers
-- Practical control or treatment actions
+- Practical control actions
 - What farmers should monitor in the future
 
 Do NOT use conversational language or self-references.
@@ -192,7 +210,8 @@ Do NOT use conversational language or self-references.
 
         except Exception:
             explanation = (
-                "Disease detected successfully, but advisory guidance could not be generated."
+                "Disease detected successfully, but advisory guidance "
+                "could not be generated."
             )
 
     # --------------------------------------------------
@@ -206,6 +225,3 @@ Do NOT use conversational language or self-references.
 
     st.write("### 🌾 Advisory & Recommendations")
     st.markdown(explanation)
-
-else:
-    st.info("Please upload a cassava leaf image and provide all required details.")
